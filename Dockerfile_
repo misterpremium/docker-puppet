@@ -1,0 +1,63 @@
+FROM ubuntu:18.04
+
+ARG vcs_ref
+ARG build_date
+ARG version="6.0.0"
+ENV PUPPET_SERVER_VERSION="$version"
+ENV DUMB_INIT_VERSION="1.2.1"
+ENV UBUNTU_CODENAME="bionic"
+ENV PUPPETSERVER_JAVA_ARGS="-Xms512m -Xmx512m"
+ENV PATH=/opt/puppetlabs/server/bin:/opt/puppetlabs/puppet/bin:/opt/puppetlabs/bin:$PATH
+ENV PUPPET_HEALTHCHECK_ENVIRONMENT="production"
+ENV PUPPETSERVER_MAX_ACTIVE_INSTANCES=1
+ENV PUPPETSERVER_MAX_REQUESTS_PER_INSTANCE=0
+
+LABEL org.label-schema.maintainer="Puppet Release Team <release@puppet.com>" \
+      org.label-schema.vendor="Puppet" \
+      org.label-schema.url="https://github.com/puppetlabs/puppetserver" \
+      org.label-schema.name="Puppet Server (No PuppetDB)" \
+      org.label-schema.license="Apache-2.0" \
+      org.label-schema.version="$PUPPET_SERVER_VERSION" \
+      org.label-schema.vcs-url="https://github.com/puppetlabs/puppetserver" \
+      org.label-schema.vcs-ref="$vcs_ref" \
+      org.label-schema.build-date="$build_date"\
+      org.label-schema.schema-version="1.0" \
+      org.label-schema.dockerfile="/Dockerfile"
+
+RUN apt-get update && \
+    apt-get -y install puppet-master && \
+    /etc/init.d/puppet-master start && \
+    /etc/init.d/puppet start
+
+COPY dumb-init_1.2.0-1_armhf.deb /
+
+
+RUN dpkg -i dumb-init_1.2.0-1_armhf.deb
+
+
+
+#COPY puppet-master   /etc/default/puppet-master
+#COPY logback.xml /etc/puppet/
+#COPY request-logging.xml /etc/puppet/
+#COPY puppet.conf /etc/puppet/
+
+
+RUN puppet config set autosign true --section master && \
+    cp -pr /etc/puppet /var/tmp && \
+    rm -rf /var/tmp/puppet/ssl
+
+COPY docker-entrypoint.sh /
+RUN chmod +x /docker-entrypoint.sh
+COPY docker-entrypoint.d /docker-entrypoint.d
+
+EXPOSE 8140
+
+ENTRYPOINT ["dumb-init", "/docker-entrypoint.sh"]
+#CMD ["foreground"]
+
+#COPY healthcheck.sh /
+#RUN chmod +x /healthcheck.sh
+#HEALTHCHECK --interval=10s --timeout=10s --retries=90 CMD ["/healthcheck.sh"]
+
+COPY Dockerfile /
+
